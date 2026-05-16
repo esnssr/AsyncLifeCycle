@@ -14,13 +14,13 @@ This is a Swift Package Manager library for UIKit async lifecycle macros.
 
 ## Build, Test, and Development Commands
 
-Prefer XcodeBuildMCP or an equivalent MCP build tool for build, test, and run workflows. At the start of a new session, confirm or set the package scheme and simulator/session defaults before building.
+CI validates the package with SwiftPM on `macos-26`. Match those commands when verifying contributor changes locally:
 
-- Build package target: use XcodeBuildMCP with scheme `AsyncLifeCycle`.
-- Run tests: use XcodeBuildMCP test action for scheme `AsyncLifeCycle`.
-- CLI fallback only when MCP is unavailable: `xcodebuild test -scheme AsyncLifeCycle -destination 'platform=macOS'`.
+- `swift build` builds the package and macro plugin.
+- `swift test` runs the `AsyncLifeCycleTests` suite.
+- `xcodebuild test -scheme AsyncLifeCycle -destination 'platform=macOS'` is a useful Xcode fallback when testing the generated scheme.
 
-Do not run `swift build` for this repository.
+Automated agent sessions should prefer XcodeBuildMCP or an equivalent MCP build tool for build, test, and run workflows. At the start of a new session, confirm or set the package scheme and simulator/session defaults before building.
 
 ## Coding Style & Naming Conventions
 
