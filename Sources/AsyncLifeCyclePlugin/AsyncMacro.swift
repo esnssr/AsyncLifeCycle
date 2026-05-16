@@ -93,9 +93,7 @@ public struct AsyncMacro: MemberMacro {
         parameterCount: Int,
         in declaration: some DeclGroupSyntax
     ) -> Bool {
-        containsMethod(named: name, parameterCount: parameterCount, in: declaration) { function in
-            function.signature.description.contains(" async")
-        }
+        containsMethod(named: name, parameterCount: parameterCount, in: declaration, where: isAsyncFunction)
     }
 
     private static func containsSyncMethod(
@@ -104,10 +102,14 @@ public struct AsyncMacro: MemberMacro {
         in declaration: some DeclGroupSyntax
     ) -> Bool {
         containsMethod(named: name, parameterCount: parameterCount, in: declaration) { function in
-            !function.signature.description.contains(" async")
+            !isAsyncFunction(function)
         }
     }
 
+
+    private static func isAsyncFunction(_ function: FunctionDeclSyntax) -> Bool {
+        function.signature.effectSpecifiers?.asyncSpecifier != nil
+    }
     private static func containsMethod(
         named name: String,
         parameterCount: Int,
@@ -145,7 +147,7 @@ public struct AsyncMacro: MemberMacro {
                   lifeCycleHooks.contains(where: { hook in
                       function.name.text == hook.methodName
                           && function.signature.parameterClause.parameters.count == hook.parameterCount
-                          && function.signature.description.contains(" async")
+                          && isAsyncFunction(function)
                   }) else {
                 continue
             }
