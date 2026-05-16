@@ -35,7 +35,7 @@ controllers on iOS.
 Add this package to your project:
 
 ```swift
-.package(url: "git@github.com:esnssr/AsyncLifeCycle.git", branch: "main")
+.package(url: "git@github.com:esnssr/AsyncLifeCycle.git", from: "0.1.0")
 ```
 
 Then add `AsyncLifeCycle` to the target that uses UIKit view controllers.

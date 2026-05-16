@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Test, and Release
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate Tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must use semantic versioning, for example 0.1.0 or v0.1.0."
+            exit 1
+          fi
+
+      - name: Build
+        run: swift build
+
+      - name: Run Tests
+        run: swift test
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
