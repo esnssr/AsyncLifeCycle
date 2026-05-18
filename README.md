@@ -58,6 +58,19 @@ final class FeedViewController: UIViewController {
 
 Do not call UIKit `super` methods from async lifecycle hooks. The macro calls `super` from the generated synchronous override so UIKit lifecycle behavior stays in UIKit's call stack.
 
+## Supported UIKit Hooks
+
+| Component | Async hook | Supported | Cancellation behavior |
+| --- | --- | --- | --- |
+| `UIViewController` | `viewDidLoad()` | Yes | Starts a tracked task. |
+| `UIViewController` | `viewWillAppear(_ animated: Bool)` | Yes | Starts a tracked task. |
+| `UIViewController` | `viewIsAppearing(_ animated: Bool)` | Yes | Starts a tracked task. |
+| `UIViewController` | `viewDidAppear(_ animated: Bool)` | Yes | Starts a tracked task. |
+| `UIViewController` | `viewWillDisappear(_ animated: Bool)` | Yes | Starts a tracked task. |
+| `UIViewController` | `viewDidDisappear(_ animated: Bool)` | Yes | Cancels active tasks, then starts the async hook if provided. |
+
+`viewDidDisappear(_:)` is generated even when no async `viewDidDisappear(_:)` hook is implemented, because the macro uses it to cancel active tasks.
+
 ## Logging
 
 Logging is disabled by default. Enable it during app startup:
@@ -67,3 +80,7 @@ AsyncLifeCycleConfiguration.current = AsyncLifeCycleConfiguration(isLoggingEnabl
 ```
 
 The package logs essential task start, completion, cancellation, and task bag deinitialization events.
+
+## Package Internals
+
+See [Documentation/Architecture.md](Documentation/Architecture.md) for the macro structure and the process for adding future UIKit component support.
