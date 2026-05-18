@@ -1,6 +1,6 @@
 import struct OSLog.Logger
 
-/// Minimal package-internal logger for lifecycle task events.
+/// Minimal package-internal logger for async hook task events.
 ///
 /// The logger intentionally reads `AsyncLifeCycleConfiguration.current` at each
 /// call site so logging can be toggled at runtime without recreating task bags.

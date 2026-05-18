@@ -1,8 +1,8 @@
 import Synchronization
 
-/// Global runtime configuration for async lifecycle hooks.
+/// Global runtime configuration for generated async hook code.
 public struct AsyncLifeCycleConfiguration: Sendable {
-    /// Controls whether essential lifecycle task events are emitted to `OSLog`.
+    /// Controls whether essential async hook task events are emitted to `OSLog`.
     public var isLoggingEnabled: Bool
 
     /// Creates a runtime configuration.
