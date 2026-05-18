@@ -2,6 +2,7 @@ import SwiftSyntax
 
 enum AsyncComponentRegistry {
     static let profiles: [AsyncComponentProfile] = [
+        .uiView,
         .uiViewController
     ]
 
