@@ -71,11 +71,6 @@ Do not call UIKit `super` methods from async hooks. The macro calls `super` from
 | `UIView` | `didMoveToWindow()` | ✅ | Cancels active tasks when `window == nil`, then starts the async hook if provided. |
 | `UIView` | `didMoveToSuperview()` | ✅ | Starts a tracked task. |
 | `UIView` | `layoutSubviews()` | ✅ | Starts a tracked task. |
-| `UIView` | `updateConstraints()` | ✅ | Starts a tracked task. |
-| `UIView` | `safeAreaInsetsDidChange()` | ✅ | Starts a tracked task. |
-| `UIView` | `layoutMarginsDidChange()` | ✅ | Starts a tracked task. |
-| `UIView` | `tintColorDidChange()` | ✅ | Starts a tracked task. |
-| `UIView` | `traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?)` | ✅ | Starts a tracked task. |
 
 `viewDidDisappear(_:)` is generated even when no async `viewDidDisappear(_:)` hook is implemented, because the macro uses it to cancel active tasks.
 `didMoveToWindow()` is generated for `UIView` subclasses even when no async `didMoveToWindow()` hook is implemented, because the macro uses it to cancel active tasks when a view leaves its window.

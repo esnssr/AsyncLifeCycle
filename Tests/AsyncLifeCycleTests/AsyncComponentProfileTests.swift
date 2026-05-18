@@ -25,6 +25,19 @@ final class AsyncComponentProfileTests: XCTestCase {
         XCTAssertTrue(supportedBaseTypes.contains("UIKit.UIView"))
     }
 
+    func testViewProfileSupportsOnlyInitialViewHooks() {
+        let hookNames = AsyncComponentProfile.uiView.hooks.map(\.signature.displayName)
+
+        XCTAssertEqual(
+            hookNames,
+            [
+                "didMoveToWindow()",
+                "didMoveToSuperview()",
+                "layoutSubviews()"
+            ]
+        )
+    }
+
     func testEveryProfileDeclaresBaseTypesAndHooks() {
         for profile in AsyncComponentRegistry.profiles {
             XCTAssertFalse(profile.supportedBaseTypes.isEmpty, "\(profile.name) must declare at least one supported base type.")
