@@ -7,11 +7,22 @@ final class AsyncComponentProfileTests: XCTestCase {
         XCTAssertTrue(AsyncComponentRegistry.profiles.contains(.uiViewController))
     }
 
+    func testRegistryContainsViewProfile() {
+        XCTAssertTrue(AsyncComponentRegistry.profiles.contains(.uiView))
+    }
+
     func testViewControllerProfileSupportsQualifiedAndUnqualifiedBaseTypes() {
         let supportedBaseTypes = AsyncComponentProfile.uiViewController.supportedBaseTypes
 
         XCTAssertTrue(supportedBaseTypes.contains("UIViewController"))
         XCTAssertTrue(supportedBaseTypes.contains("UIKit.UIViewController"))
+    }
+
+    func testViewProfileSupportsQualifiedAndUnqualifiedBaseTypes() {
+        let supportedBaseTypes = AsyncComponentProfile.uiView.supportedBaseTypes
+
+        XCTAssertTrue(supportedBaseTypes.contains("UIView"))
+        XCTAssertTrue(supportedBaseTypes.contains("UIKit.UIView"))
     }
 
     func testEveryProfileDeclaresBaseTypesAndHooks() {
