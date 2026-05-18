@@ -331,48 +331,4 @@ final class AsyncMacroExpansionTests: XCTestCase {
         )
     }
 
-    func testViewTraitCollectionDidChangeExpansion() {
-        assertMacroExpansion(
-            """
-            @Async
-            final class DemoView: UIView {
-                func traitCollectionDidChange(_ previousTraitCollection: UIKit.UITraitCollection?) async {}
-            }
-            """,
-            expandedSource:
-            """
-            final class DemoView: UIView {
-                func traitCollectionDidChange(_ previousTraitCollection: UIKit.UITraitCollection?) async {}
-
-                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoView")
-
-                private func __asyncLifeCycleStartTask(
-                    methodName: String,
-                    _ operation: @escaping @MainActor @Sendable () async -> Void
-                ) {
-                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
-                }
-
-                private func __asyncLifeCycleCancelTasks() {
-                    __asyncLifeCycleTaskBag.cancelAll()
-                }
-
-                override func traitCollectionDidChange(_ previousTraitCollection: UIKit.UITraitCollection?) {
-                    super.traitCollectionDidChange(previousTraitCollection)
-                    __asyncLifeCycleStartTask(methodName: "traitCollectionDidChange") { @MainActor [weak self] in
-                        await self?.traitCollectionDidChange(previousTraitCollection)
-                    }
-                }
-
-                override func didMoveToWindow() {
-                    super.didMoveToWindow()
-                    if window == nil {
-                        __asyncLifeCycleCancelTasks()
-                    }
-                }
-            }
-            """,
-            macros: macros
-        )
-    }
 }

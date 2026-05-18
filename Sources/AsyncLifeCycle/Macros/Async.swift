@@ -24,12 +24,7 @@
         named(viewDidDisappear),
         named(didMoveToWindow),
         named(didMoveToSuperview),
-        named(layoutSubviews),
-        named(updateConstraints),
-        named(safeAreaInsetsDidChange),
-        named(layoutMarginsDidChange),
-        named(tintColorDidChange),
-        named(traitCollectionDidChange)
+        named(layoutSubviews)
 )
 public macro Async() = #externalMacro(
     module: "AsyncLifeCyclePlugin",
