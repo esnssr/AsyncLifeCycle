@@ -9,7 +9,7 @@ final class AsyncMacroDiagnosticTests: XCTestCase {
         "Async": AsyncMacro.self
     ]
 
-    func testDiagnosesUseOnNonDirectUIViewControllerSubclass() {
+    func testDiagnosesUnsupportedCustomBaseClass() {
         assertMacroExpansion(
             """
             @Async
@@ -23,7 +23,34 @@ final class AsyncMacroDiagnosticTests: XCTestCase {
             """,
             diagnostics: [
                 DiagnosticSpec(
-                    message: "@Async can only be applied to direct UIViewController subclasses. Macros cannot safely prove that another superclass is a UIViewController subclass.",
+                    message: "@Async does not support this type yet. Use a supported UIKit type directly, or add a component profile for it.",
+                    line: 1,
+                    column: 1
+                )
+            ],
+            macros: macros
+        )
+    }
+
+    func testDiagnosesUnsupportedUIKitComponent() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoView: UIView {
+                func didMoveToWindow() async {
+                }
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoView: UIView {
+                func didMoveToWindow() async {
+                }
+            }
+            """,
+            diagnostics: [
+                DiagnosticSpec(
+                    message: "@Async does not support this type yet. Use a supported UIKit type directly, or add a component profile for it.",
                     line: 1,
                     column: 1
                 )
@@ -83,7 +110,7 @@ final class AsyncMacroDiagnosticTests: XCTestCase {
             """,
             diagnostics: [
                 DiagnosticSpec(
-                    message: "@Async needs to generate viewDidDisappear(_:) to cancel active tasks. Remove your viewDidDisappear(_:) override, or do not use this macro on this class.",
+                    message: "@Async needs to generate viewDidDisappear(_:) to manage task cancellation for UIViewController. Remove your viewDidDisappear(_:) override, or do not use this macro on this class.",
                     line: 1,
                     column: 1
                 )
@@ -112,7 +139,7 @@ final class AsyncMacroDiagnosticTests: XCTestCase {
             """,
             diagnostics: [
                 DiagnosticSpec(
-                    message: "Do not call super from async lifecycle hooks. @Async calls UIKit super methods synchronously in the generated lifecycle override.",
+                    message: "Do not call super from async UIKit hooks. @Async calls UIKit super methods synchronously in the generated override.",
                     line: 4,
                     column: 9,
                     fixIts: [

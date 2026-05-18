@@ -90,4 +90,158 @@ final class AsyncMacroExpansionTests: XCTestCase {
             macros: macros
         )
     }
+
+    func testUIKitQualifiedViewControllerExpansion() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoViewController: UIKit.UIViewController {
+                func viewDidLoad() async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoViewController: UIKit.UIViewController {
+                func viewDidLoad() async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoViewController")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func viewDidLoad() {
+                    super.viewDidLoad()
+                    __asyncLifeCycleStartTask(methodName: "viewDidLoad") { @MainActor [weak self] in
+                        await self?.viewDidLoad()
+                    }
+                }
+
+                override func viewDidDisappear(_ animated: Bool) {
+                    super.viewDidDisappear(animated)
+                    __asyncLifeCycleCancelTasks()
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
+
+    func testIgnoresAsyncHookWithWrongParameterType() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(_ animated: String) async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(_ animated: String) async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoViewController")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func viewDidDisappear(_ animated: Bool) {
+                    super.viewDidDisappear(animated)
+                    __asyncLifeCycleCancelTasks()
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
+
+    func testIgnoresAsyncHookWithWrongExternalParameterLabel() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(animated: Bool) async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(animated: Bool) async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoViewController")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func viewDidDisappear(_ animated: Bool) {
+                    super.viewDidDisappear(animated)
+                    __asyncLifeCycleCancelTasks()
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
+
+    func testAcceptsQualifiedBoolParameterType() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(_ animated: Swift.Bool) async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoViewController: UIViewController {
+                func viewDidDisappear(_ animated: Swift.Bool) async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoViewController")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func viewDidDisappear(_ animated: Bool) {
+                    super.viewDidDisappear(animated)
+                    __asyncLifeCycleCancelTasks()
+                    __asyncLifeCycleStartTask(methodName: "viewDidDisappear") { @MainActor [weak self] in
+                        await self?.viewDidDisappear(animated)
+                    }
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
 }
