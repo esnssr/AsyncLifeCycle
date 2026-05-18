@@ -1,6 +1,15 @@
 name: Release
 
+run-name: "${{ github.event_name == 'workflow_dispatch' && 'Release: create next minor from main' || format('Release: {0}', github.ref_name) }}"
+
 on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview the next minor SemVer tag from main without creating a tag or GitHub Release."
+        required: true
+        default: false
+        type: boolean
   push:
     tags:
       - "*.*.*"
@@ -18,14 +27,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
           fetch-depth: 0
 
-      - name: Validate Tag
+      - name: Determine release tag
+        id: version
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tags must use semantic versioning, for example 0.1.0 or v0.1.0."
-            exit 1
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            latest_tag="$(
+              git tag --list |
+              awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ {
+                tag = $0
+                version = tag
+                sub(/^v/, "", version)
+                split(version, parts, ".")
+                printf "%08d.%08d.%08d %s\n", parts[1], parts[2], parts[3], tag
+              }' |
+              sort |
+              tail -n 1 |
+              awk '{ print $2 }'
+            )"
+
+            if [[ -z "$latest_tag" ]]; then
+              release_tag="0.1.0"
+            else
+              version="${latest_tag#v}"
+              IFS=. read -r major minor patch <<< "$version"
+
+              if [[ "$latest_tag" == v* ]]; then
+                prefix="v"
+              else
+                prefix=""
+              fi
+
+              release_tag="${prefix}${major}.$((minor + 1)).0"
+            fi
+
+            if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+              echo "Tag $release_tag already exists."
+              exit 1
+            fi
+          else
+            release_tag="$GITHUB_REF_NAME"
+
+            if [[ ! "$release_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Release tags must use semantic versioning, for example 0.1.0 or v0.1.0."
+              exit 1
+            fi
           fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: swift build
@@ -33,7 +84,25 @@ jobs:
       - name: Run Tests
         run: swift test
 
+      - name: Create and push tag
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.release_tag }}" -m "Release ${{ steps.version.outputs.release_tag }}"
+          git push origin "${{ steps.version.outputs.release_tag }}"
+
       - name: Create GitHub Release
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: |
+          gh release create "${{ steps.version.outputs.release_tag }}" \
+            --title "${{ steps.version.outputs.release_tag }}" \
+            --generate-notes \
+            --verify-tag
+
+      - name: Release Summary
+        run: |
+          echo "Release tag: ${{ steps.version.outputs.release_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dry run: ${{ inputs.dry_run || false }}" >> "$GITHUB_STEP_SUMMARY"
