@@ -4,6 +4,23 @@ struct AsyncHook: Hashable {
     let superArguments: String
     let asyncArguments: String
     let cancelsExistingTasksBeforeStart: Bool
+    let cancellationCondition: String?
+
+    init(
+        signature: AsyncHookSignature,
+        overrideParameters: String,
+        superArguments: String,
+        asyncArguments: String,
+        cancelsExistingTasksBeforeStart: Bool,
+        cancellationCondition: String? = nil
+    ) {
+        self.signature = signature
+        self.overrideParameters = overrideParameters
+        self.superArguments = superArguments
+        self.asyncArguments = asyncArguments
+        self.cancelsExistingTasksBeforeStart = cancelsExistingTasksBeforeStart
+        self.cancellationCondition = cancellationCondition
+    }
 
     var overrideSource: String {
         var lines = [
@@ -12,7 +29,7 @@ struct AsyncHook: Hashable {
         ]
 
         if cancelsExistingTasksBeforeStart {
-            lines.append("    __asyncLifeCycleCancelTasks()")
+            lines += cancellationLines
         }
 
         lines += [
@@ -26,15 +43,28 @@ struct AsyncHook: Hashable {
     }
 
     var cancellationOnlyOverrideSource: String {
-        [
+        var lines = [
             "override func \(signature.name)\(parameterClause) {",
-            "    super.\(signature.name)(\(superArguments))",
-            "    __asyncLifeCycleCancelTasks()",
-            "}"
-        ].joined(separator: "\n")
+            "    super.\(signature.name)(\(superArguments))"
+        ]
+        lines += cancellationLines
+        lines.append("}")
+        return lines.joined(separator: "\n")
     }
 
     private var parameterClause: String {
         overrideParameters.isEmpty ? "()" : "(\(overrideParameters))"
+    }
+
+    private var cancellationLines: [String] {
+        guard let cancellationCondition else {
+            return ["    __asyncLifeCycleCancelTasks()"]
+        }
+
+        return [
+            "    if \(cancellationCondition) {",
+            "        __asyncLifeCycleCancelTasks()",
+            "    }"
+        ]
     }
 }

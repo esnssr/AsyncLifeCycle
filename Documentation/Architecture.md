@@ -23,7 +23,7 @@ Reusable plugin foundations live under `Sources/AsyncLifeCyclePlugin/Foundation/
 - `AsyncHookSignature` matches user-written async methods by name, labels, and accepted type spellings.
 - `AsyncMemberGenerator` creates shared task storage and enabled hook overrides.
 
-Diagnostics live under `Sources/AsyncLifeCyclePlugin/Diagnostics/`. Concrete UIKit support lives under `Sources/AsyncLifeCyclePlugin/Components/UIKit/`.
+Diagnostics live under `Sources/AsyncLifeCyclePlugin/Diagnostics/`. Concrete UIKit support lives under `Sources/AsyncLifeCyclePlugin/Components/UIKit/`, with one folder per supported component.
 
 ## Adding Type Support
 
