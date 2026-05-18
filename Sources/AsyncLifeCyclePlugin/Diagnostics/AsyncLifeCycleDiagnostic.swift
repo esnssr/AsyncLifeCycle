@@ -8,7 +8,7 @@ struct AsyncLifeCycleDiagnostic: DiagnosticMessage {
     }
 
     var diagnosticID: MessageID {
-        MessageID(domain: "AsyncLifeCycle", id: "invalid-async-lifecycle-controller")
+        MessageID(domain: "AsyncLifeCycle", id: "invalid-async-uikit-usage")
     }
 
     var severity: DiagnosticSeverity {
