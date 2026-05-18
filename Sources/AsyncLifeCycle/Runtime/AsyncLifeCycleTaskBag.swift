@@ -1,6 +1,6 @@
 import Synchronization
 
-/// Tracks async lifecycle tasks for a single view controller instance.
+/// Tracks async hook tasks for a single generated owner instance.
 ///
 /// This type is public only because generated macro code lives in the client
 /// module. It is hidden from generated documentation and should be treated as
@@ -9,7 +9,7 @@ import Synchronization
 public final class _AsyncLifeCycleTaskBag: Sendable {
 
     /// Stores the method name beside the task so cancellation logs can report
-    /// which async lifecycle hooks were still running.
+    /// which async hooks were still running.
     private struct TaskRecord: Sendable {
         var methodName: String
         var task: Task<Void, Never>
@@ -25,7 +25,7 @@ public final class _AsyncLifeCycleTaskBag: Sendable {
     private let logger: Logger
     private let state = Mutex(State())
 
-    /// Creates a task bag for a generated async lifecycle owner.
+    /// Creates a task bag for a generated async hook owner.
     public init(ownerType: String) {
         self.ownerType = ownerType
         self.logger = Logger()
@@ -36,7 +36,7 @@ public final class _AsyncLifeCycleTaskBag: Sendable {
         cancelAll()
     }
 
-    /// Starts and tracks a main-actor async lifecycle task.
+    /// Starts and tracks a main-actor async hook task.
     ///
     /// Completed tasks remove themselves from the bag so later cancellation
     /// logs only include work that was still active.
@@ -89,7 +89,7 @@ public final class _AsyncLifeCycleTaskBag: Sendable {
         }
     }
 
-    /// Removes a task after its async lifecycle hook returns.
+    /// Removes a task after its async hook returns.
     private func removeTask(id: Int) {
         state.withLock { state in
             _ = state.tasks.removeValue(forKey: id)
