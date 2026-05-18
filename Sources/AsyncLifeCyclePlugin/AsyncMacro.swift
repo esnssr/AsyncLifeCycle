@@ -1,7 +1,6 @@
 import SwiftCompilerPlugin
 import SwiftDiagnostics
 public import SwiftSyntax
-import SwiftSyntaxBuilder
 public import SwiftSyntaxMacros
 
 @main
@@ -22,97 +21,87 @@ public struct AsyncMacro: MemberMacro {
             context.diagnose(
                 Diagnostic(
                     node: Syntax(node),
-                    message: AsyncLifeCycleDiagnostic("@Async can only be applied to a UIViewController subclass.")
+                    message: AsyncLifeCycleDiagnostic("@Async can only be applied to a supported UIKit class.")
                 )
             )
             return []
         }
 
-        guard inheritsDirectlyFromUIViewController(classDeclaration) else {
+        guard let profile = AsyncComponentRegistry.profile(for: classDeclaration) else {
             context.diagnose(
                 Diagnostic(
                     node: Syntax(node),
-                    message: AsyncLifeCycleDiagnostic("@Async can only be applied to direct UIViewController subclasses. Macros cannot safely prove that another superclass is a UIViewController subclass.")
+                    message: AsyncLifeCycleDiagnostic("@Async does not support this type yet. Use a supported UIKit type directly, or add a component profile for it.")
                 )
             )
             return []
         }
 
-        if diagnoseSuperCalls(in: declaration, context: context) {
+        if diagnoseSuperCalls(in: declaration, profile: profile, context: context) {
             return []
         }
 
         // Member macros cannot merge generated overrides with user-written
         // overrides, so report a focused diagnostic before Swift reports a
         // duplicate method error.
-        for hook in lifeCycleHooks {
-            guard containsAsyncMethod(named: hook.methodName, parameterCount: hook.parameterCount, in: declaration),
-                  containsSyncMethod(named: hook.methodName, parameterCount: hook.parameterCount, in: declaration) else {
+        for hook in profile.hooks {
+            guard containsAsyncMethod(matching: hook.signature, in: declaration),
+                  containsSyncMethod(matching: hook.signature, in: declaration) else {
                 continue
             }
 
             context.diagnose(
                 Diagnostic(
                     node: Syntax(node),
-                    message: AsyncLifeCycleDiagnostic("@Async cannot generate \(hook.methodName) because this class already defines a synchronous override. Move synchronous work into \(hook.methodName)(...) async, or remove the async hook and manage that lifecycle method yourself.")
+                    message: AsyncLifeCycleDiagnostic("@Async cannot generate \(hook.signature.name) because this class already defines a synchronous override. Move synchronous work into \(hook.signature.name)(...) async, or remove the async hook and manage that lifecycle method yourself.")
                 )
             )
             return []
         }
 
-        // viewDidDisappear is reserved even without an async viewDidDisappear
-        // because cancellation must run when the controller leaves the screen.
-        if containsSyncMethod(named: "viewDidDisappear", parameterCount: 1, in: declaration) {
+        // The profile's cancellation hook is reserved even without a matching
+        // async hook because task cancellation must stay under macro control.
+        if let cancellationHook = profile.cancellationHook,
+           containsSyncMethod(matching: cancellationHook, in: declaration) {
             context.diagnose(
                 Diagnostic(
                     node: Syntax(node),
-                    message: AsyncLifeCycleDiagnostic("@Async needs to generate viewDidDisappear(_:) to cancel active tasks. Remove your viewDidDisappear(_:) override, or do not use this macro on this class.")
+                    message: AsyncLifeCycleDiagnostic("@Async needs to generate \(cancellationHook.displayName) to manage task cancellation for \(profile.name). Remove your \(cancellationHook.displayName) override, or do not use this macro on this class.")
                 )
             )
             return []
         }
 
-        var members = taskStorageMembers(ownerType: classDeclaration.name.text)
-        members += lifeCycleHooks.compactMap { hook in
-            guard containsAsyncMethod(named: hook.methodName, parameterCount: hook.parameterCount, in: declaration) else {
-                return nil
-            }
-
-            return DeclSyntax(stringLiteral: hook.overrideSource)
+        let enabledHooks = profile.hooks.filter { hook in
+            containsAsyncMethod(matching: hook.signature, in: declaration)
         }
-
-        if !containsAsyncMethod(named: "viewDidDisappear", parameterCount: 1, in: declaration) {
-            members.append(DeclSyntax(stringLiteral: cancellationOnlyViewDidDisappearSource))
-        }
-
-        return members
+        return AsyncMemberGenerator.members(
+            ownerType: classDeclaration.name.text,
+            profile: profile,
+            enabledHooks: enabledHooks
+        )
     }
 
     private static func containsAsyncMethod(
-        named name: String,
-        parameterCount: Int,
+        matching signature: AsyncHookSignature,
         in declaration: some DeclGroupSyntax
     ) -> Bool {
-        containsMethod(named: name, parameterCount: parameterCount, in: declaration, where: isAsyncFunction)
-    }
-
-    private static func containsSyncMethod(
-        named name: String,
-        parameterCount: Int,
-        in declaration: some DeclGroupSyntax
-    ) -> Bool {
-        containsMethod(named: name, parameterCount: parameterCount, in: declaration) { function in
-            !isAsyncFunction(function)
+        containsMethod(matching: signature, in: declaration) { function in
+            function.isAsyncFunction
         }
     }
 
-
-    private static func isAsyncFunction(_ function: FunctionDeclSyntax) -> Bool {
-        function.signature.effectSpecifiers?.asyncSpecifier != nil
+    private static func containsSyncMethod(
+        matching signature: AsyncHookSignature,
+        in declaration: some DeclGroupSyntax
+    ) -> Bool {
+        containsMethod(matching: signature, in: declaration) { function in
+            !function.isAsyncFunction
+        }
     }
+
     private static func containsMethod(
-        named name: String,
-        parameterCount: Int,
+        matching signature: AsyncHookSignature,
         in declaration: some DeclGroupSyntax,
         where predicate: (FunctionDeclSyntax) -> Bool = { _ in true }
     ) -> Bool {
@@ -121,45 +110,33 @@ public struct AsyncMacro: MemberMacro {
                 return false
             }
 
-            return function.name.text == name
-                && function.signature.parameterClause.parameters.count == parameterCount
+            return signature.matches(function.asyncHookSignature)
                 && predicate(function)
         }
     }
 
-    private static func inheritsDirectlyFromUIViewController(_ declaration: ClassDeclSyntax) -> Bool {
-        // Macros do not receive semantic type information, so this check is
-        // intentionally limited to direct UIViewController inheritance.
-        declaration.inheritanceClause?.inheritedTypes.contains { inheritedType in
-            let typeName = inheritedType.type.trimmedDescription
-            return typeName == "UIViewController" || typeName == "UIKit.UIViewController"
-        } ?? false
-    }
-
     private static func diagnoseSuperCalls(
         in declaration: some DeclGroupSyntax,
+        profile: AsyncComponentProfile,
         context: some MacroExpansionContext
     ) -> Bool {
         var diagnosed = false
 
         for member in declaration.memberBlock.members {
             guard let function = member.decl.as(FunctionDeclSyntax.self),
-                  lifeCycleHooks.contains(where: { hook in
-                      function.name.text == hook.methodName
-                          && function.signature.parameterClause.parameters.count == hook.parameterCount
-                          && isAsyncFunction(function)
-                  }) else {
+                  profile.hook(matching: function.asyncHookSignature) != nil,
+                  function.isAsyncFunction else {
                 continue
             }
 
             for statement in superCallStatements(in: function) {
-                // UIKit super calls must stay in the generated synchronous
-                // override. Calling them from the async hook would run them
-                // later, outside UIKit's lifecycle call stack.
+                // UIKit super calls must stay in the generated synchronous override.
+                // Calling them from an async hook would run them later, outside
+                // UIKit's original call stack.
                 context.diagnose(
                     Diagnostic(
                         node: Syntax(statement),
-                        message: AsyncLifeCycleDiagnostic("Do not call super from async lifecycle hooks. @Async calls UIKit super methods synchronously in the generated lifecycle override."),
+                        message: AsyncLifeCycleDiagnostic("Do not call super from async UIKit hooks. @Async calls UIKit super methods synchronously in the generated override."),
                         fixIts: [
                             FixIt(
                                 message: AsyncLifeCycleFixItMessage("Remove super call"),
@@ -192,152 +169,5 @@ public struct AsyncMacro: MemberMacro {
             visitor.walk(statement)
             return visitor.foundSuperReference
         }
-    }
-}
-
-private final class SuperReferenceVisitor: SyntaxVisitor {
-    private(set) var foundSuperReference = false
-
-    override func visit(_ node: SuperExprSyntax) -> SyntaxVisitorContinueKind {
-        foundSuperReference = true
-        return .skipChildren
-    }
-}
-
-private struct AsyncLifeCycleFixItMessage: FixItMessage {
-    let message: String
-
-    init(_ message: String) {
-        self.message = message
-    }
-
-    var fixItID: MessageID {
-        MessageID(domain: "AsyncLifeCycle", id: "fix-it")
-    }
-}
-
-private struct LifeCycleHook {
-    let methodName: String
-    let parameterCount: Int
-    let overrideSource: String
-}
-
-private let lifeCycleHooks: [LifeCycleHook] = [
-    LifeCycleHook(
-        methodName: "viewDidLoad",
-        parameterCount: 0,
-        overrideSource: """
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            __asyncLifeCycleStartTask(methodName: "viewDidLoad") { @MainActor [weak self] in
-                await self?.viewDidLoad()
-            }
-        }
-        """
-    ),
-    LifeCycleHook(
-        methodName: "viewWillAppear",
-        parameterCount: 1,
-        overrideSource: """
-        override func viewWillAppear(_ animated: Bool) {
-            super.viewWillAppear(animated)
-            __asyncLifeCycleStartTask(methodName: "viewWillAppear") { @MainActor [weak self] in
-                await self?.viewWillAppear(animated)
-            }
-        }
-        """
-    ),
-    LifeCycleHook(
-        methodName: "viewIsAppearing",
-        parameterCount: 1,
-        overrideSource: """
-        override func viewIsAppearing(_ animated: Bool) {
-            super.viewIsAppearing(animated)
-            __asyncLifeCycleStartTask(methodName: "viewIsAppearing") { @MainActor [weak self] in
-                await self?.viewIsAppearing(animated)
-            }
-        }
-        """
-    ),
-    LifeCycleHook(
-        methodName: "viewDidAppear",
-        parameterCount: 1,
-        overrideSource: """
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            __asyncLifeCycleStartTask(methodName: "viewDidAppear") { @MainActor [weak self] in
-                await self?.viewDidAppear(animated)
-            }
-        }
-        """
-    ),
-    LifeCycleHook(
-        methodName: "viewWillDisappear",
-        parameterCount: 1,
-        overrideSource: """
-        override func viewWillDisappear(_ animated: Bool) {
-            super.viewWillDisappear(animated)
-            __asyncLifeCycleStartTask(methodName: "viewWillDisappear") { @MainActor [weak self] in
-                await self?.viewWillDisappear(animated)
-            }
-        }
-        """
-    ),
-    LifeCycleHook(
-        methodName: "viewDidDisappear",
-        parameterCount: 1,
-        overrideSource: """
-        override func viewDidDisappear(_ animated: Bool) {
-            super.viewDidDisappear(animated)
-            __asyncLifeCycleCancelTasks()
-            __asyncLifeCycleStartTask(methodName: "viewDidDisappear") { @MainActor [weak self] in
-                await self?.viewDidDisappear(animated)
-            }
-        }
-        """
-    )
-]
-
-private func taskStorageMembers(ownerType: String) -> [DeclSyntax] {
-    [
-        DeclSyntax(stringLiteral: """
-        private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "\(ownerType)")
-        """),
-        DeclSyntax(stringLiteral: """
-        private func __asyncLifeCycleStartTask(
-            methodName: String,
-            _ operation: @escaping @MainActor @Sendable () async -> Void
-        ) {
-            __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
-        }
-        """),
-        DeclSyntax(stringLiteral: """
-        private func __asyncLifeCycleCancelTasks() {
-            __asyncLifeCycleTaskBag.cancelAll()
-        }
-        """)
-    ]
-}
-
-private let cancellationOnlyViewDidDisappearSource = """
-override func viewDidDisappear(_ animated: Bool) {
-    super.viewDidDisappear(animated)
-    __asyncLifeCycleCancelTasks()
-}
-"""
-
-private struct AsyncLifeCycleDiagnostic: DiagnosticMessage {
-    let message: String
-
-    init(_ message: String) {
-        self.message = message
-    }
-
-    var diagnosticID: MessageID {
-        MessageID(domain: "AsyncLifeCycle", id: "invalid-async-lifecycle-controller")
-    }
-
-    var severity: DiagnosticSeverity {
-        .error
     }
 }
