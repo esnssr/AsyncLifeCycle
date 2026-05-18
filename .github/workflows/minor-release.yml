@@ -1,0 +1,95 @@
+name: Minor Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Calculate the next minor version without creating a tag or release."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Minor Release
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Calculate next minor tag
+        id: version
+        run: |
+          latest_tag="$(
+            git tag --list |
+            awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ {
+              tag = $0
+              version = tag
+              sub(/^v/, "", version)
+              split(version, parts, ".")
+              printf "%08d.%08d.%08d %s\n", parts[1], parts[2], parts[3], tag
+            }' |
+            sort |
+            tail -n 1 |
+            awk '{ print $2 }'
+          )"
+
+          if [[ -z "$latest_tag" ]]; then
+            next_tag="0.1.0"
+          else
+            version="${latest_tag#v}"
+            IFS=. read -r major minor patch <<< "$version"
+
+            if [[ "$latest_tag" == v* ]]; then
+              prefix="v"
+            else
+              prefix=""
+            fi
+
+            next_tag="${prefix}${major}.$((minor + 1)).0"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$next_tag" >/dev/null; then
+            echo "Tag $next_tag already exists."
+            exit 1
+          fi
+
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: swift build
+
+      - name: Run Tests
+        run: swift test
+
+      - name: Create and push tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.next_tag }}" -m "Release ${{ steps.version.outputs.next_tag }}"
+          git push origin "${{ steps.version.outputs.next_tag }}"
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.next_tag }}" \
+            --title "${{ steps.version.outputs.next_tag }}" \
+            --generate-notes \
+            --verify-tag
+
+      - name: Release Summary
+        run: |
+          echo "Latest tag: ${{ steps.version.outputs.latest_tag || 'none' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Next minor tag: ${{ steps.version.outputs.next_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dry run: ${{ inputs.dry_run }}" >> "$GITHUB_STEP_SUMMARY"
