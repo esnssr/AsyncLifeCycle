@@ -1,6 +1,6 @@
 # AsyncLifeCycle
 
-AsyncLifeCycle adds cancellable async lifecycle hooks to UIKit view controllers with an `@Async` macro.
+AsyncLifeCycle adds cancellable async hooks to supported UIKit components with an `@Async` macro.
 
 ```swift
 import AsyncLifeCycle
@@ -18,7 +18,7 @@ final class ProfileViewController: UIViewController {
 }
 ```
 
-Generated UIKit overrides call `super` synchronously, then start the matching async hook in a tracked task. Active tasks are canceled automatically from `viewDidDisappear(_:)` and when the task bag deinitializes.
+Generated UIKit overrides call `super` synchronously, then start the matching async hook in a tracked task. Active tasks are canceled automatically from each component's cancellation hook and when the task bag deinitializes.
 
 ## Requirements
 
@@ -27,8 +27,8 @@ Generated UIKit overrides call `super` synchronously, then start the matching as
 - Xcode 26+
 
 The package declares a macOS host platform so SwiftPM can build the compiler
-plugin and test target. The lifecycle API itself is intended for UIKit view
-controllers on iOS.
+plugin and test target. The async hook API itself is intended for UIKit
+components on iOS.
 
 ## Installation
 
@@ -38,11 +38,11 @@ Add this package to your project:
 .package(url: "git@github.com:esnssr/AsyncLifeCycle.git", from: "0.1.0")
 ```
 
-Then add `AsyncLifeCycle` to the target that uses UIKit view controllers.
+Then add `AsyncLifeCycle` to the target that uses UIKit components.
 
 ## Usage
 
-Apply `@Async` to a direct `UIViewController` subclass and implement any supported async lifecycle hook:
+Apply `@Async` to a direct supported UIKit subclass and implement any supported async hook:
 
 ```swift
 @Async
@@ -56,20 +56,34 @@ final class FeedViewController: UIViewController {
 }
 ```
 
-Do not call UIKit `super` methods from async lifecycle hooks. The macro calls `super` from the generated synchronous override so UIKit lifecycle behavior stays in UIKit's call stack.
+Do not call UIKit `super` methods from async hooks. The macro calls `super` from the generated synchronous override so UIKit behavior stays in UIKit's call stack.
 
 ## Supported UIKit Hooks
 
-| Component | Async hook | Supported | Cancellation behavior |
+| Component | Async hook | Support | Cancellation behavior |
 | --- | --- | --- | --- |
-| `UIViewController` | `viewDidLoad()` | Yes | Starts a tracked task. |
-| `UIViewController` | `viewWillAppear(_ animated: Bool)` | Yes | Starts a tracked task. |
-| `UIViewController` | `viewIsAppearing(_ animated: Bool)` | Yes | Starts a tracked task. |
-| `UIViewController` | `viewDidAppear(_ animated: Bool)` | Yes | Starts a tracked task. |
-| `UIViewController` | `viewWillDisappear(_ animated: Bool)` | Yes | Starts a tracked task. |
-| `UIViewController` | `viewDidDisappear(_ animated: Bool)` | Yes | Cancels active tasks, then starts the async hook if provided. |
+| `UIViewController` | `viewDidLoad()` | ✅ | Starts a tracked task. |
+| `UIViewController` | `viewWillAppear(_ animated: Bool)` | ✅ | Starts a tracked task. |
+| `UIViewController` | `viewIsAppearing(_ animated: Bool)` | ✅ | Starts a tracked task. |
+| `UIViewController` | `viewDidAppear(_ animated: Bool)` | ✅ | Starts a tracked task. |
+| `UIViewController` | `viewWillDisappear(_ animated: Bool)` | ✅ | Starts a tracked task. |
+| `UIViewController` | `viewDidDisappear(_ animated: Bool)` | ✅ | Cancels active tasks, then starts the async hook if provided. |
+| `UIView` | `didMoveToWindow()` | ✅ | Cancels active tasks when `window == nil`, then starts the async hook if provided. |
+| `UIView` | `didMoveToSuperview()` | ✅ | Starts a tracked task. |
+| `UIView` | `layoutSubviews()` | ✅ | Starts a tracked task. |
 
 `viewDidDisappear(_:)` is generated even when no async `viewDidDisappear(_:)` hook is implemented, because the macro uses it to cancel active tasks.
+`didMoveToWindow()` is generated for `UIView` subclasses even when no async `didMoveToWindow()` hook is implemented, because the macro uses it to cancel active tasks when a view leaves its window.
+
+## Not Yet Supported
+
+| Component | Essential hooks to support later | Support |
+| --- | --- | --- |
+| `UITableViewCell` | `prepareForReuse()`, `didMoveToWindow()`, `layoutSubviews()` | Not yet |
+| `UICollectionViewCell` | `prepareForReuse()`, `didMoveToWindow()`, `layoutSubviews()` | Not yet |
+| `UITableViewHeaderFooterView` | `prepareForReuse()`, `didMoveToWindow()`, `layoutSubviews()` | Not yet |
+| `UIControl` | `beginTracking(_:with:)`, `continueTracking(_:with:)`, `endTracking(_:with:)`, `cancelTracking(with:)` | Not yet |
+| `UIGestureRecognizer` | `reset()`, touch handling hooks | Not yet |
 
 ## Logging
 

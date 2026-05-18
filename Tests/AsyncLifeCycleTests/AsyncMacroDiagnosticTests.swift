@@ -36,15 +36,15 @@ final class AsyncMacroDiagnosticTests: XCTestCase {
         assertMacroExpansion(
             """
             @Async
-            final class DemoView: UIView {
-                func didMoveToWindow() async {
+            final class DemoCell: UICollectionViewCell {
+                func prepareForReuse() async {
                 }
             }
             """,
             expandedSource:
             """
-            final class DemoView: UIView {
-                func didMoveToWindow() async {
+            final class DemoCell: UICollectionViewCell {
+                func prepareForReuse() async {
                 }
             }
             """,

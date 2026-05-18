@@ -244,4 +244,91 @@ final class AsyncMacroExpansionTests: XCTestCase {
             macros: macros
         )
     }
+
+    func testViewDidMoveToWindowExpansionCancelsWhenRemovedFromWindow() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoView: UIView {
+                func didMoveToWindow() async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoView: UIView {
+                func didMoveToWindow() async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoView")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func didMoveToWindow() {
+                    super.didMoveToWindow()
+                    if window == nil {
+                        __asyncLifeCycleCancelTasks()
+                    }
+                    __asyncLifeCycleStartTask(methodName: "didMoveToWindow") { @MainActor [weak self] in
+                        await self?.didMoveToWindow()
+                    }
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
+
+    func testViewLayoutSubviewsExpansionAddsWindowRemovalCancellationOverride() {
+        assertMacroExpansion(
+            """
+            @Async
+            final class DemoView: UIKit.UIView {
+                func layoutSubviews() async {}
+            }
+            """,
+            expandedSource:
+            """
+            final class DemoView: UIKit.UIView {
+                func layoutSubviews() async {}
+
+                private let __asyncLifeCycleTaskBag = _AsyncLifeCycleTaskBag(ownerType: "DemoView")
+
+                private func __asyncLifeCycleStartTask(
+                    methodName: String,
+                    _ operation: @escaping @MainActor @Sendable () async -> Void
+                ) {
+                    __asyncLifeCycleTaskBag.start(methodName: methodName, operation)
+                }
+
+                private func __asyncLifeCycleCancelTasks() {
+                    __asyncLifeCycleTaskBag.cancelAll()
+                }
+
+                override func layoutSubviews() {
+                    super.layoutSubviews()
+                    __asyncLifeCycleStartTask(methodName: "layoutSubviews") { @MainActor [weak self] in
+                        await self?.layoutSubviews()
+                    }
+                }
+
+                override func didMoveToWindow() {
+                    super.didMoveToWindow()
+                    if window == nil {
+                        __asyncLifeCycleCancelTasks()
+                    }
+                }
+            }
+            """,
+            macros: macros
+        )
+    }
+
 }
