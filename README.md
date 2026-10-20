@@ -18,17 +18,17 @@ final class ProfileViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        task(until: .disappear) { await self.refresh() }    // until it disappears
+        task(until: .willDisappear) { await self.refresh() }  // until viewWillDisappear
     }
 }
 ```
 
 - `.removal` (the default) ends when the screen is popped, dismissed, or removed from its parent
   or the window.
-- `.disappear` ends when the screen starts to disappear: another screen pushed on top, a tab
+- `.willDisappear` ends at `viewWillDisappear(_:)`: another screen pushed on top, a tab
   switch, a swipe back (even an abandoned one), or removal.
 - A screen kept and shown again doesn't rerun `viewDidLoad()`; start its work in
-  `viewWillAppear(_:)` with `.disappear` instead.
+  `viewWillAppear(_:)` with `.willDisappear` instead.
 - `storeTask(_:until:)` ties a task you created yourself to a lifetime; `cancelTasks(_:)` cancels
   early.
 
