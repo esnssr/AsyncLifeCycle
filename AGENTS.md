@@ -2,37 +2,34 @@
 
 ## Project Structure & Module Organization
 
-This is a Swift Package Manager library for UIKit async lifecycle macros.
+This is a Swift Package Manager library that gives UIKit screens SwiftUI-style `task { }` calls.
 
-- `Package.swift` defines the `AsyncLifeCycle` library product, the `AsyncLifeCyclePlugin` macro target, and `AsyncLifeCycleTests`.
-- `Sources/AsyncLifeCycle/` contains public API and runtime support:
-  - `Macros/` exposes macro declarations.
-  - `Runtime/` contains task tracking and logging.
-  - `Configuration/` contains package configuration.
-- `Sources/AsyncLifeCyclePlugin/` contains the compiler macro implementation.
-- `Tests/AsyncLifeCycleTests/` contains macro expansion, diagnostics, and runtime tests.
+- `Package.swift` defines the `AsyncLifeCycle` library product and `AsyncLifeCycleTests`.
+- `Sources/AsyncLifeCycle/` holds the public API (`UIViewController+Task.swift`, `TaskLifetime.swift`),
+  the per-screen `TaskStore`, and `LifeCycleSwizzler`, which hooks `viewWillDisappear(_:)`,
+  `viewDidDisappear(_:)` and `didMove(toParent:)`.
+- `Tests/AsyncLifeCycleTests/` runs real screens in a window on the iOS simulator.
 
 ## Build, Test, and Development Commands
 
-CI validates the package with SwiftPM on `macos-26`. Match those commands when verifying contributor changes locally:
+The package is iOS only, so SwiftPM's `swift build` and `swift test` (macOS) don't apply. CI runs:
 
-- `swift build` builds the package and macro plugin.
-- `swift test` runs the `AsyncLifeCycleTests` suite.
-- `xcodebuild test -scheme AsyncLifeCycle -destination 'platform=macOS'` is a useful Xcode fallback when testing the generated scheme.
+- `xcodebuild test -scheme AsyncLifeCycle -destination 'platform=iOS Simulator,name=<iPhone>'`
 
 Automated agent sessions should prefer XcodeBuildMCP or an equivalent MCP build tool for build, test, and run workflows. At the start of a new session, confirm or set the package scheme and simulator/session defaults before building.
 
+Package tests have no host app, so presented screens and tab switches get no appearance callbacks
+there. Check those cases in an app on the simulator.
+
 ## Coding Style & Naming Conventions
 
-Use Swift 6.2 style with 4-space indentation. Keep source files focused by target responsibility: public macro declarations in `Sources/AsyncLifeCycle/Macros`, runtime types in `Runtime`, and compiler implementation details in `AsyncLifeCyclePlugin`.
+Use Swift 6.2 style with 4-space indentation. Keep source files focused on one type or one public extension.
 
 Use `UpperCamelCase` for types, `lowerCamelCase` for functions and properties, and descriptive test names that state the behavior being verified. Prefer explicit concurrency behavior and avoid broad visibility; keep declarations internal unless they are part of the package API.
 
 ## Testing Guidelines
 
-Tests use Swift Testing and SwiftSyntax macro test support. Add or update tests when changing macro output, diagnostics, runtime task cancellation, or logging behavior.
-
-Place macro expansion tests in `AsyncMacroExpansionTests.swift`, diagnostic checks in `AsyncMacroDiagnosticTests.swift`, and runtime behavior tests in `AsyncLifeCycleRuntimeTests.swift`. Keep fixtures minimal and assert generated source or diagnostics precisely.
+Tests use Swift Testing. Add or update tests when changing when tasks are cancelled or how they're stored. Keep the suite serialized: tests share the main run loop and the swizzle.
 
 ## Commit & Pull Request Guidelines
 
@@ -42,4 +39,4 @@ Pull requests should include a brief summary, test evidence, and any behavior or
 
 ## Agent-Specific Instructions
 
-When creating files with author metadata, use `Eslam Nasser assisted by Codex` rather than generic tool or agent names. When addressing PR comments, resolve only comments that were actually fixed and pushed. Never force push unless explicitly required.
+When creating files with author metadata, use `Eslam Nasser assisted by <agent>`, with `Codex` or `Claude` as the agent. When addressing PR comments, resolve only comments that were actually fixed and pushed. Never force push unless explicitly required.
