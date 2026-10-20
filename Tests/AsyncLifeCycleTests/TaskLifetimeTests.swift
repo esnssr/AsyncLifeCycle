@@ -17,7 +17,7 @@ struct TaskLifetimeTests {
         let navigation = UINavigationController(rootViewController: screen)
         let window = await show(navigation)
         let removal = longTask(on: screen, until: .removal)
-        let disappear = longTask(on: screen, until: .disappear)
+        let disappear = longTask(on: screen, until: .willDisappear)
 
         let next = UIViewController()
         navigation.pushViewController(next, animated: false)
@@ -35,7 +35,7 @@ struct TaskLifetimeTests {
         navigation.pushViewController(screen, animated: false)
         await settle { screen.viewIfLoaded?.window != nil }
         let removal = longTask(on: screen, until: .removal)
-        let disappear = longTask(on: screen, until: .disappear)
+        let disappear = longTask(on: screen, until: .willDisappear)
 
         navigation.popViewController(animated: false)
         await settle { removal.isCancelled }
@@ -178,7 +178,7 @@ struct TaskLifetimeTests {
         screen.didMove(toParent: parent)
         await settle { screen.viewIfLoaded?.window != nil }
         let removal = longTask(on: screen, until: .removal)
-        let disappear = longTask(on: screen, until: .disappear)
+        let disappear = longTask(on: screen, until: .willDisappear)
 
         screen.willMove(toParent: nil)
         screen.view.removeFromSuperview()
@@ -195,7 +195,7 @@ struct TaskLifetimeTests {
         let navigation = UINavigationController(rootViewController: screen)
         let window = await show(navigation)
         let stored = Task { try? await Task.sleep(for: .seconds(60)) }
-        screen.storeTask(stored, until: .disappear)
+        screen.storeTask(stored, until: .willDisappear)
 
         navigation.pushViewController(UIViewController(), animated: false)
         await settle { stored.isCancelled }
@@ -207,9 +207,9 @@ struct TaskLifetimeTests {
     @Test func cancelTasksCancelsTheGivenLifetimeOrAll() {
         let screen = UIViewController()
         let removal = longTask(on: screen, until: .removal)
-        let disappear = longTask(on: screen, until: .disappear)
+        let disappear = longTask(on: screen, until: .willDisappear)
 
-        screen.cancelTasks(.disappear)
+        screen.cancelTasks(.willDisappear)
         #expect(!removal.isCancelled)
         #expect(disappear.isCancelled)
 
@@ -305,7 +305,7 @@ private final class RefreshingScreen: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        refreshes.append(task(until: .disappear) { try? await Task.sleep(for: .seconds(60)) })
+        refreshes.append(task(until: .willDisappear) { try? await Task.sleep(for: .seconds(60)) })
     }
 }
 

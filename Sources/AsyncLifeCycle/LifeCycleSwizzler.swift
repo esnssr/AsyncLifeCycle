@@ -14,13 +14,13 @@ enum LifeCycleSwizzler {
 
     private static let installed: Void = {
         replaceAnimatedMethod(#selector(UIViewController.viewWillDisappear(_:))) { screen in
-            screen.existingTaskStore?.cancel([.disappear])
+            screen.existingTaskStore?.cancel([.willDisappear])
         }
         replaceAnimatedMethod(#selector(UIViewController.viewDidDisappear(_:))) { screen in
             if screen.isBeingRemoved {
-                screen.cancelTasksIncludingChildren([.disappear, .removal])
+                screen.cancelTasksIncludingChildren([.willDisappear, .removal])
             } else {
-                screen.existingTaskStore?.cancel([.disappear])
+                screen.existingTaskStore?.cancel([.willDisappear])
             }
         }
         replaceDidMoveToParent()

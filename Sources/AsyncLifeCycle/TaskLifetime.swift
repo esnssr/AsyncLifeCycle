@@ -5,5 +5,5 @@ public enum TaskLifetime: Sendable {
     case removal
     /// When the screen starts to disappear (`viewWillDisappear(_:)`): another screen pushed on top,
     /// a tab switch, a swipe back (even one the user abandons), or removal.
-    case disappear
+    case willDisappear
 }

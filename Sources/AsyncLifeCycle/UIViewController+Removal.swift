@@ -32,7 +32,7 @@ extension UIViewController {
             guard let self, parent == nil, presentingViewController == nil, viewIfLoaded?.window == nil else {
                 return
             }
-            cancelTasksIncludingChildren([.disappear, .removal])
+            cancelTasksIncludingChildren([.willDisappear, .removal])
         }
     }
 
