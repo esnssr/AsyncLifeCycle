@@ -15,8 +15,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Build
-        run: swift build
-
-      - name: Run Tests
-        run: swift test
+      - name: Test on the iOS simulator
+        run: |
+          # An iPhone on the newest installed iOS runtime (simctl doesn't list runtimes in order).
+          udid="$(xcrun simctl list devices available --json | jq -r '[.devices | to_entries[] | select(.key | test("iOS-[0-9]+-[0-9]+$")) | (.key | capture("iOS-(?<major>[0-9]+)-(?<minor>[0-9]+)$") | [(.major | tonumber), (.minor | tonumber)]) as $version | .value[] | select(.name | startswith("iPhone")) | {version: $version, udid}] | sort_by(.version) | last | .udid // empty')"
+          if [[ -z "$udid" ]]; then
+            echo "No available iPhone simulator."
+            exit 1
+          fi
+          xcodebuild test -scheme AsyncLifeCycle -destination "id=$udid"

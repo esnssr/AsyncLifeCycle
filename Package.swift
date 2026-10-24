@@ -1,6 +1,5 @@
 // swift-tools-version: 6.2
 
-import CompilerPluginSupport
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
@@ -12,8 +11,7 @@ let swiftSettings: [SwiftSetting] = [
 let package = Package(
     name: "AsyncLifeCycle",
     platforms: [
-        .iOS(.v18),
-        .macOS(.v15)
+        .iOS(.v18)
     ],
     products: [
         .library(
@@ -21,32 +19,14 @@ let package = Package(
             targets: ["AsyncLifeCycle"]
         )
     ],
-    dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0")
-    ],
     targets: [
-        .macro(
-            name: "AsyncLifeCyclePlugin",
-            dependencies: [
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-                .product(name: "SwiftSyntax", package: "swift-syntax"),
-                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
-                .product(name: "SwiftSyntaxMacros", package: "swift-syntax")
-            ],
-            swiftSettings: swiftSettings
-        ),
         .target(
             name: "AsyncLifeCycle",
-            dependencies: ["AsyncLifeCyclePlugin"],
             swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "AsyncLifeCycleTests",
-            dependencies: [
-                "AsyncLifeCycle",
-                "AsyncLifeCyclePlugin",
-                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")
-            ],
+            dependencies: ["AsyncLifeCycle"],
             swiftSettings: swiftSettings
         )
     ]
